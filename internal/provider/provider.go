@@ -375,6 +375,7 @@ func (p *theProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		NewScheduleDataSource,
 		NewTeamDataSource,
 		NewUserDataSource,
+		NewEdaProjectDataSource,
 	}
 }
 
