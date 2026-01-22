@@ -15,7 +15,7 @@ Creates a host.
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }

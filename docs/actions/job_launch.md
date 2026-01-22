@@ -21,7 +21,7 @@ Moreover, you can set `wait_for_completion` to true, then Terraform will wait un
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }

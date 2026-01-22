@@ -16,7 +16,7 @@ Sends an event payload to an EDA Event Stream URL
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }

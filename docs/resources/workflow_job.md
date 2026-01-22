@@ -25,7 +25,7 @@ This resource always creates a new workflow job in AAP. A destroy will not delet
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }

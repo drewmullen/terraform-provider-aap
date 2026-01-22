@@ -2,7 +2,7 @@
 
 The AAP Provider allows Terraform to manage AAP resources. It provides a means of executing automation jobs on infrastructure provisioned by Terraform, leveraging the AAP API to manage inventories and launch jobs.
 
-The provider can be found on [the Terraform registry](https://registry.terraform.io/providers/ansible/aap/latest).
+The provider can be found on [the Terraform registry](https://registry.terraform.io/providers/drewmullen/aap/latest).
 
 
 ## Requirements
@@ -18,7 +18,7 @@ Run `make build`. This will build a `terraform-provider-aap` binary in the top l
 ```
 provider_installation {
   dev_overrides {
-    "ansible/aap" = "/path/to/project/root"
+    "drewmullen/aap" = "/path/to/project/root"
   }
 
   direct {}
@@ -118,7 +118,7 @@ To release a new version of the provider:
 2. Run `antsibull-changelog release --version <version>` to release a new version of the project.
 3. Commit changes
 4. Push a new tag (this should trigger an automated release process to the Terraform Registry). The tag version *must* start with "v", for example, v1.2.3.
-5. Verify the new version is published at https://registry.terraform.io/providers/ansible/aap/latest
+5. Verify the new version is published at https://registry.terraform.io/providers/drewmullen/aap/latest
 
 ## Supported Platforms
 

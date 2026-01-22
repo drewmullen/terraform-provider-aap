@@ -20,7 +20,7 @@ a subset of AAP resources.
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }

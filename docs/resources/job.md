@@ -31,7 +31,7 @@ You can also tweak `wait_for_completion_timeout_seconds` to control the timeout 
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }

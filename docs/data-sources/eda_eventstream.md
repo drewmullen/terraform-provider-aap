@@ -15,7 +15,7 @@ Gets an existing EDA Event Stream.
 terraform {
   required_providers {
     aap = {
-      source = "ansible/aap"
+      source = "drewmullen/aap"
     }
   }
 }
