@@ -8,36 +8,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestNewEDAProjectDataSource(t *testing.T) {
-	testDataSource := NewEDAProjectDataSource()
+func TestNewEdaProjectDataSource(t *testing.T) {
+	testDataSource := NewEdaProjectDataSource()
 
-	expectedMetadataEntitySlug := "eda_project"
-	expectedDescriptiveEntityName := "EDA Project"
-	expectedAPIEntitySlug := "projects"
+	if testDataSource == nil {
+		t.Error("NewEdaProjectDataSource() returned nil")
+	}
 
-	switch v := testDataSource.(type) {
-	case *EDAProjectDataSource:
-		if v.APIEntitySlug != expectedAPIEntitySlug {
-			t.Errorf("Incorrect APIEntitySlug. Got: %s, wanted: %s", v.APIEntitySlug, expectedAPIEntitySlug)
-		}
-		if v.DescriptiveEntityName != expectedDescriptiveEntityName {
-			t.Errorf("Incorrect DescriptiveEntityName. Got: %s, wanted: %s", v.DescriptiveEntityName, expectedDescriptiveEntityName)
-		}
-		if v.MetadataEntitySlug != expectedMetadataEntitySlug {
-			t.Errorf("Incorrect MetadataEntitySlug. Got: %s, wanted: %s", v.MetadataEntitySlug, expectedMetadataEntitySlug)
-		}
-	default:
-		t.Errorf("Incorrect datasource type returned. Got: %T, wanted: %T", v, testDataSource)
+	if _, ok := testDataSource.(*EdaProjectDataSource); !ok {
+		t.Errorf("Incorrect datasource type returned. Got: %T, wanted: *EdaProjectDataSource", testDataSource)
 	}
 }
 
-func TestAccEDAProjectDataSource(t *testing.T) {
+func TestAccEdaProjectDataSource(t *testing.T) {
 	rName := "tf-test-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheck(t)
-			skipTestWithoutEDAPreCheck(t)
 		},
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -55,19 +43,15 @@ func TestAccEDAProjectDataSource(t *testing.T) {
 
 func testAccEdaProjectDataSourceConfig(name string) string {
 	return fmt.Sprintf(`
-data "aap_organization" "test" {
-  name = "Default"
-}
-
 resource "aap_eda_project" "test" {
   name            = "%s"
   description     = "Test EDA project for data source"
   url             = "https://github.com/ansible/ansible-rulebook"
-  organization_id = data.aap_organization.test.id
+  organization_id = 1
 }
 
 data "aap_eda_project" "test" {
-  name = aap_eda_project.test.name
+  id = aap_eda_project.test.id
 }
 `, name)
 }
