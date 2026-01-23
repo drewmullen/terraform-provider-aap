@@ -1,13 +1,10 @@
 package provider
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
-	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -16,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
@@ -30,7 +26,7 @@ func NewEdaProjectResource() resource.Resource {
 }
 
 type EdaProjectResource struct {
-	client ProviderHTTPClient
+	client *providerClient
 }
 
 type EdaProjectResourceModel struct {
@@ -108,24 +104,15 @@ func (r *EdaProjectResource) Schema(_ context.Context, _ resource.SchemaRequest,
 }
 
 func (r *EdaProjectResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if resp == nil {
-		tflog.Error(ctx, "Response not defined, we cannot continue with the execution.")
-		return
-	}
-
-	if !IsContextActive(ctx, "Configure", &resp.Diagnostics) {
-		return
-	}
-
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*AAPClient)
+	client, ok := req.ProviderData.(*providerClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *AAPClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
@@ -147,25 +134,27 @@ func (r *EdaProjectResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	edaEndpoint := r.client.getEdaAPIEndpoint()
-	if edaEndpoint == "" {
+	projectsURL := "eda/api/v1/projects/"
+	requestData := requestBody
+	createResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPost, projectsURL, json.RawMessage(requestData), []int{http.StatusCreated}, "gateway")
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"EDA API Endpoint is empty",
-			"Expected a valid endpoint but was an empty string. Please report this issue to the provider developers.",
+			"Error creating EDA project",
+			fmt.Sprintf("Could not create EDA project: %s", err.Error()),
 		)
 		return
 	}
 
-	projectsURL := path.Join(edaEndpoint, "projects")
-	requestData := bytes.NewReader(requestBody)
-	createResponseBody, diags := r.client.Create(projectsURL, requestData)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	responseBytes, err := json.Marshal(createResponseBody)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error marshaling response",
+			fmt.Sprintf("Could not marshal response: %s", err.Error()),
+		)
 		return
 	}
 
-	diags = plan.parseHTTPResponse(createResponseBody)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(plan.parseHTTPResponse(responseBytes)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -181,28 +170,24 @@ func (r *EdaProjectResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	edaEndpoint := r.client.getEdaAPIEndpoint()
-	if edaEndpoint == "" {
+	projectsURL := fmt.Sprintf("eda/api/v1/projects/?name=%s", state.Name.ValueString())
+
+	readResponseBody, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectsURL, nil, []int{http.StatusOK, http.StatusNotFound}, "gateway")
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"EDA API Endpoint is empty",
-			"Expected a valid endpoint but was an empty string. Please report this issue to the provider developers.",
+			"Error reading EDA project",
+			fmt.Sprintf("Could not read EDA project: %s", err.Error()),
 		)
 		return
 	}
 
-	projectsURL := path.Join(edaEndpoint, "projects")
-	params := map[string]string{
-		"name": state.Name.ValueString(),
-	}
-
-	readResponseBody, diags := r.client.GetWithParams(projectsURL, params)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if statusCode == http.StatusNotFound {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	var listResponse EdaProjectListResponse
-	err := json.Unmarshal(readResponseBody, &listResponse)
+	err = json.Unmarshal(readResponseBody, &listResponse)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error parsing JSON response from AAP",
@@ -225,7 +210,7 @@ func (r *EdaProjectResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	project := listResponse.Results[0]
-	diags = state.parseAPIModel(&project)
+	diags := state.parseAPIModel(&project)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -248,25 +233,27 @@ func (r *EdaProjectResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	edaEndpoint := r.client.getEdaAPIEndpoint()
-	if edaEndpoint == "" {
+	projectURL := fmt.Sprintf("eda/api/v1/projects/%d/", plan.ID.ValueInt64())
+	requestData := requestBody
+	updateResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPatch, projectURL, json.RawMessage(requestData), []int{http.StatusOK}, "gateway")
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"EDA API Endpoint is empty",
-			"Expected a valid endpoint but was an empty string. Please report this issue to the provider developers.",
+			"Error updating EDA project",
+			fmt.Sprintf("Could not update EDA project: %s", err.Error()),
 		)
 		return
 	}
 
-	projectURL := path.Join(edaEndpoint, "projects", strconv.FormatInt(plan.ID.ValueInt64(), 10))
-	requestData := bytes.NewReader(requestBody)
-	updateResponseBody, diags := r.client.Patch(projectURL, requestData)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	responseBytes, err := json.Marshal(updateResponseBody)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error marshaling response",
+			fmt.Sprintf("Could not marshal response: %s", err.Error()),
+		)
 		return
 	}
 
-	diags = plan.parseHTTPResponse(updateResponseBody)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(plan.parseHTTPResponse(responseBytes)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -290,23 +277,17 @@ func (r *EdaProjectResource) ImportState(ctx context.Context, req resource.Impor
 	var state EdaProjectResourceModel
 	state.ID = types.Int64Value(projectID)
 
-	edaEndpoint := r.client.getEdaAPIEndpoint()
-	if edaEndpoint == "" {
+	projectURL := fmt.Sprintf("eda/api/v1/projects/%d/", projectID)
+	readResponseBody, _, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectURL, nil, []int{http.StatusOK}, "gateway")
+	if err != nil {
 		resp.Diagnostics.AddError(
-			"EDA API Endpoint is empty",
-			"Expected a valid endpoint but was an empty string. Please report this issue to the provider developers.",
+			"Error reading EDA project",
+			fmt.Sprintf("Could not read EDA project: %s", err.Error()),
 		)
 		return
 	}
 
-	projectURL := path.Join(edaEndpoint, "projects", strconv.FormatInt(projectID, 10))
-	readResponseBody, diags := r.client.Get(projectURL)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	diags = state.parseHTTPResponse(readResponseBody)
+	diags := state.parseHTTPResponse(readResponseBody)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -323,21 +304,17 @@ func (r *EdaProjectResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	edaEndpoint := r.client.getEdaAPIEndpoint()
-	if edaEndpoint == "" {
-		resp.Diagnostics.AddError(
-			"EDA API Endpoint is empty",
-			"Expected a valid endpoint but was an empty string. Please report this issue to the provider developers.",
-		)
-		return
-	}
-
-	projectURL := path.Join(edaEndpoint, "projects", strconv.FormatInt(state.ID.ValueInt64(), 10))
-	_, diags, statusCode := r.client.DeleteWithStatus(projectURL)
+	projectURL := fmt.Sprintf("eda/api/v1/projects/%d/", state.ID.ValueInt64())
+	_, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodDelete, projectURL, nil, []int{http.StatusNoContent, http.StatusNotFound}, "gateway")
 	if statusCode == http.StatusNotFound {
 		return
 	}
-	resp.Diagnostics.Append(diags...)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting EDA project",
+			fmt.Sprintf("Could not delete EDA project: %s", err.Error()),
+		)
+	}
 }
 
 func (r *EdaProjectResourceModel) generateRequestBody() ([]byte, diag.Diagnostics) {
@@ -378,11 +355,23 @@ func (r *EdaProjectResourceModel) parseHTTPResponse(body []byte) diag.Diagnostic
 func (r *EdaProjectResourceModel) parseAPIModel(apiProject *EdaProjectAPIModel) diag.Diagnostics {
 	r.ID = types.Int64Value(apiProject.ID)
 	r.Name = types.StringValue(apiProject.Name)
-	r.Description = ParseStringValue(apiProject.Description)
+	if apiProject.Description != "" {
+		r.Description = types.StringValue(apiProject.Description)
+	} else {
+		r.Description = types.StringNull()
+	}
 	r.URL = types.StringValue(apiProject.URL)
-	r.SCMBranch = ParseStringValue(apiProject.SCMBranch)
+	if apiProject.SCMBranch != "" {
+		r.SCMBranch = types.StringValue(apiProject.SCMBranch)
+	} else {
+		r.SCMBranch = types.StringNull()
+	}
 	r.OrganizationID = types.Int64Value(apiProject.OrganizationID)
-	r.Proxy = ParseStringValue(apiProject.Proxy)
+	if apiProject.Proxy != "" {
+		r.Proxy = types.StringValue(apiProject.Proxy)
+	} else {
+		r.Proxy = types.StringNull()
+	}
 
 	return nil
 }
