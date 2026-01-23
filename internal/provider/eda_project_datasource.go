@@ -114,9 +114,9 @@ func (d *EdaProjectDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	var url string
 
 	if !data.ID.IsNull() {
-		url = fmt.Sprintf("eda/api/v1/projects/%s/", data.ID.ValueString())
+		url = fmt.Sprintf("api/eda/v1/projects/%s/", data.ID.ValueString())
 	} else if !data.Name.IsNull() {
-		url = fmt.Sprintf("eda/api/v1/projects/?name=%s", urlParser.QueryEscape(data.Name.ValueString()))
+		url = fmt.Sprintf("api/eda/v1/projects/?name=%s", urlParser.QueryEscape(data.Name.ValueString()))
 	}
 
 	body, statusCode, err := d.client.GenericAPIRequest(ctx, http.MethodGet, url, nil, []int{200, 404}, "eda")

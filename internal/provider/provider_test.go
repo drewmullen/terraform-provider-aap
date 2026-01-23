@@ -18,7 +18,7 @@ func testAccPreCheck(t *testing.T) {
 	if v := os.Getenv("AAP_HOST"); v == "" {
 		t.Fatal("AAP_HOST must be set for acceptance tests")
 	}
-	if v := os.Getenv("AAP_OAUTH_TOKEN"); v == "" {
-		t.Fatal("AAP_OAUTH_TOKEN must be set for acceptance tests")
+	if os.Getenv("AAP_OAUTH_TOKEN") == "" && os.Getenv("AAP_TOKEN") == "" && (os.Getenv("AAP_USERNAME") == "" || os.Getenv("AAP_PASSWORD") == "") {
+		t.Fatal("AAP_OAUTH_TOKEN, AAP_TOKEN, or AAP_USERNAME/AAP_PASSWORD must be set for acceptance tests")
 	}
 }

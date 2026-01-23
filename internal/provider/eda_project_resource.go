@@ -134,7 +134,7 @@ func (r *EdaProjectResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	projectsURL := "eda/api/v1/projects/"
+	projectsURL := "api/eda/v1/projects/"
 	requestData := requestBody
 	createResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPost, projectsURL, json.RawMessage(requestData), []int{http.StatusCreated}, "eda")
 	if err != nil {
@@ -170,7 +170,7 @@ func (r *EdaProjectResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	projectsURL := fmt.Sprintf("eda/api/v1/projects/?name=%s", state.Name.ValueString())
+	projectsURL := fmt.Sprintf("api/eda/v1/projects/?name=%s", state.Name.ValueString())
 
 	readResponseBody, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectsURL, nil, []int{http.StatusOK, http.StatusNotFound}, "eda")
 	if err != nil {
@@ -233,7 +233,7 @@ func (r *EdaProjectResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", plan.ID.ValueString())
+	projectURL := fmt.Sprintf("api/eda/v1/projects/%s/", plan.ID.ValueString())
 	requestData := requestBody
 	updateResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPatch, projectURL, json.RawMessage(requestData), []int{http.StatusOK}, "eda")
 	if err != nil {
@@ -267,7 +267,7 @@ func (r *EdaProjectResource) ImportState(ctx context.Context, req resource.Impor
 	var state EdaProjectResourceModel
 	state.ID = types.StringValue(id)
 
-	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", id)
+	projectURL := fmt.Sprintf("api/eda/v1/projects/%s/", id)
 	readResponseBody, _, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectURL, nil, []int{http.StatusOK}, "eda")
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -294,9 +294,9 @@ func (r *EdaProjectResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", state.ID.ValueString())
-	_, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodDelete, projectURL, nil, []int{http.StatusNoContent, http.StatusNotFound}, "eda")
-	if statusCode == http.StatusNotFound {
+	projectURL := fmt.Sprintf("api/eda/v1/projects/%s/", state.ID.ValueString())
+	_, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodDelete, projectURL, nil, []int{202, 204}, "eda")
+	if statusCode == 404 {
 		return
 	}
 	if err != nil {
@@ -304,6 +304,7 @@ func (r *EdaProjectResource) Delete(ctx context.Context, req resource.DeleteRequ
 			"Error deleting EDA project",
 			fmt.Sprintf("Could not delete EDA project: %s", err.Error()),
 		)
+		return
 	}
 }
 
