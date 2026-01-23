@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
+	urlParser "net/url"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -40,11 +42,13 @@ func (d *EdaProjectDataSource) Schema(ctx context.Context, req datasource.Schema
 		Description: "Get EDA project datasource",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "EDA Project ID.",
-				Required:    true,
+				Description: "EDA Project ID. You must specify either the `id` or `name` field, but not both.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "EDA Project name.",
+				Description: "EDA Project name. You must specify either the `id` or `name` field, but not both.",
+				Optional:    true,
 				Computed:    true,
 			},
 			"description": schema.StringAttribute{
@@ -64,6 +68,19 @@ func (d *EdaProjectDataSource) Schema(ctx context.Context, req datasource.Schema
 				Computed:    true,
 			},
 		},
+	}
+}
+
+func (d *EdaProjectDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {
+	return []datasource.ConfigValidator{
+		datasourcevalidator.Conflicting(
+			path.MatchRoot("id"),
+			path.MatchRoot("name"),
+		),
+		datasourcevalidator.AtLeastOneOf(
+			path.MatchRoot("id"),
+			path.MatchRoot("name"),
+		),
 	}
 }
 
@@ -94,16 +111,14 @@ func (d *EdaProjectDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	id, err := strconv.Atoi(data.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Unable convert id from string to int.",
-			fmt.Sprintf("Unable to convert id: %v. ", data.ID.ValueString()))
-		return
+	var url string
+
+	if !data.ID.IsNull() {
+		url = fmt.Sprintf("eda/api/v1/projects/%s/", data.ID.ValueString())
+	} else if !data.Name.IsNull() {
+		url = fmt.Sprintf("eda/api/v1/projects/?name=%s", urlParser.QueryEscape(data.Name.ValueString()))
 	}
 
-	// Get EDA endpoint and build URL
-	url := fmt.Sprintf("eda/api/v1/projects/%d/", id)
 	body, statusCode, err := d.client.GenericAPIRequest(ctx, http.MethodGet, url, nil, []int{200, 404}, "gateway")
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -119,16 +134,47 @@ func (d *EdaProjectDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	var responseData EdaProjectAPIModel
 
-	err = json.Unmarshal(body, &responseData)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Unable to unmarshal response body into object",
-			fmt.Sprintf("Error =  %v.", err.Error()))
-		return
+	// If we got a list response (name lookup), extract first result
+	if !data.ID.IsNull() {
+		// Direct ID lookup
+		err = json.Unmarshal(body, &responseData)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to unmarshal response body into object",
+				fmt.Sprintf("Error =  %v.", err.Error()))
+			return
+		}
+	} else {
+		// Name lookup - list response
+		countResult := struct {
+			Count   int                  `json:"count"`
+			Results []EdaProjectAPIModel `json:"results"`
+		}{}
+
+		err = json.Unmarshal(body, &countResult)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to unmarshal response body into object",
+				fmt.Sprintf("Error:  %v.", err.Error()))
+			return
+		}
+
+		if countResult.Count == 0 {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
+		if countResult.Count > 1 {
+			resp.Diagnostics.AddError(
+				"Incorrect number of projects returned",
+				fmt.Sprintf("Unable to read project as API returned %v projects.", countResult.Count))
+			return
+		}
+
+		responseData = countResult.Results[0]
 	}
 
-	idAsString := strconv.FormatInt(responseData.ID, 10)
-	data.ID = types.StringValue(idAsString)
+	data.ID = types.StringValue(fmt.Sprintf("%d", responseData.ID))
 	data.Name = types.StringValue(responseData.Name)
 	data.URL = types.StringValue(responseData.URL)
 	data.OrganizationID = types.Int64Value(responseData.OrganizationID)

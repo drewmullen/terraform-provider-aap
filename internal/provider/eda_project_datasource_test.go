@@ -51,7 +51,7 @@ resource "aap_eda_project" "test" {
 }
 
 data "aap_eda_project" "test" {
-  id = aap_eda_project.test.id
+  name = aap_eda_project.test.name
 }
 `, name)
 }

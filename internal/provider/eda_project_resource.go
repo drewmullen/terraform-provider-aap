@@ -30,7 +30,7 @@ type EdaProjectResource struct {
 }
 
 type EdaProjectResourceModel struct {
-	ID             types.Int64  `tfsdk:"id"`
+	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	Description    types.String `tfsdk:"description"`
 	URL            types.String `tfsdk:"url"`
@@ -62,11 +62,11 @@ func (r *EdaProjectResource) Schema(_ context.Context, _ resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Description: "Manages an EDA Project resource.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.Int64Attribute{
+			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "The ID of the EDA project.",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -233,7 +233,7 @@ func (r *EdaProjectResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	projectURL := fmt.Sprintf("eda/api/v1/projects/%d/", plan.ID.ValueInt64())
+	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", plan.ID.ValueString())
 	requestData := requestBody
 	updateResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPatch, projectURL, json.RawMessage(requestData), []int{http.StatusOK}, "gateway")
 	if err != nil {
@@ -264,20 +264,10 @@ func (r *EdaProjectResource) Update(ctx context.Context, req resource.UpdateRequ
 func (r *EdaProjectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	id := req.ID
 
-	var projectID int64
-	_, err := fmt.Sscanf(id, "%d", &projectID)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Invalid Import ID",
-			fmt.Sprintf("Expected numeric project ID, got: %s", id),
-		)
-		return
-	}
-
 	var state EdaProjectResourceModel
-	state.ID = types.Int64Value(projectID)
+	state.ID = types.StringValue(id)
 
-	projectURL := fmt.Sprintf("eda/api/v1/projects/%d/", projectID)
+	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", id)
 	readResponseBody, _, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectURL, nil, []int{http.StatusOK}, "gateway")
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -304,7 +294,7 @@ func (r *EdaProjectResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	projectURL := fmt.Sprintf("eda/api/v1/projects/%d/", state.ID.ValueInt64())
+	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", state.ID.ValueString())
 	_, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodDelete, projectURL, nil, []int{http.StatusNoContent, http.StatusNotFound}, "gateway")
 	if statusCode == http.StatusNotFound {
 		return
@@ -353,7 +343,7 @@ func (r *EdaProjectResourceModel) parseHTTPResponse(body []byte) diag.Diagnostic
 }
 
 func (r *EdaProjectResourceModel) parseAPIModel(apiProject *EdaProjectAPIModel) diag.Diagnostics {
-	r.ID = types.Int64Value(apiProject.ID)
+	r.ID = types.StringValue(fmt.Sprintf("%d", apiProject.ID))
 	r.Name = types.StringValue(apiProject.Name)
 	if apiProject.Description != "" {
 		r.Description = types.StringValue(apiProject.Description)
