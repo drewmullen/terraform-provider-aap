@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -206,8 +207,24 @@ func (p *theProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		auth = "Basic" + " " + encodedAuth
 	}
 
+	// Check for insecure skip verify option
+	insecureSkipVerify := false
+	if envInsecure, exists := os.LookupEnv("AAP_INSECURE_SKIP_VERIFY"); exists {
+		if envInsecure == "true" || envInsecure == "1" {
+			insecureSkipVerify = true
+		}
+	}
+
 	httpclient := &http.Client{
 		Timeout: 30 * time.Second,
+	}
+
+	if insecureSkipVerify {
+		httpclient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
 	}
 
 	client := new(providerClient)

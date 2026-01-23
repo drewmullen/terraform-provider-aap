@@ -119,7 +119,7 @@ func (d *EdaProjectDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		url = fmt.Sprintf("eda/api/v1/projects/?name=%s", urlParser.QueryEscape(data.Name.ValueString()))
 	}
 
-	body, statusCode, err := d.client.GenericAPIRequest(ctx, http.MethodGet, url, nil, []int{200, 404}, "gateway")
+	body, statusCode, err := d.client.GenericAPIRequest(ctx, http.MethodGet, url, nil, []int{200, 404}, "eda")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error making API http request",

@@ -136,7 +136,7 @@ func (r *EdaProjectResource) Create(ctx context.Context, req resource.CreateRequ
 
 	projectsURL := "eda/api/v1/projects/"
 	requestData := requestBody
-	createResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPost, projectsURL, json.RawMessage(requestData), []int{http.StatusCreated}, "gateway")
+	createResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPost, projectsURL, json.RawMessage(requestData), []int{http.StatusCreated}, "eda")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating EDA project",
@@ -172,7 +172,7 @@ func (r *EdaProjectResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	projectsURL := fmt.Sprintf("eda/api/v1/projects/?name=%s", state.Name.ValueString())
 
-	readResponseBody, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectsURL, nil, []int{http.StatusOK, http.StatusNotFound}, "gateway")
+	readResponseBody, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectsURL, nil, []int{http.StatusOK, http.StatusNotFound}, "eda")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading EDA project",
@@ -235,7 +235,7 @@ func (r *EdaProjectResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", plan.ID.ValueString())
 	requestData := requestBody
-	updateResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPatch, projectURL, json.RawMessage(requestData), []int{http.StatusOK}, "gateway")
+	updateResponseBody, _, err := r.client.CreateUpdateAPIRequest(ctx, http.MethodPatch, projectURL, json.RawMessage(requestData), []int{http.StatusOK}, "eda")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating EDA project",
@@ -268,7 +268,7 @@ func (r *EdaProjectResource) ImportState(ctx context.Context, req resource.Impor
 	state.ID = types.StringValue(id)
 
 	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", id)
-	readResponseBody, _, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectURL, nil, []int{http.StatusOK}, "gateway")
+	readResponseBody, _, err := r.client.GenericAPIRequest(ctx, http.MethodGet, projectURL, nil, []int{http.StatusOK}, "eda")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading EDA project",
@@ -295,7 +295,7 @@ func (r *EdaProjectResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	projectURL := fmt.Sprintf("eda/api/v1/projects/%s/", state.ID.ValueString())
-	_, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodDelete, projectURL, nil, []int{http.StatusNoContent, http.StatusNotFound}, "gateway")
+	_, statusCode, err := r.client.GenericAPIRequest(ctx, http.MethodDelete, projectURL, nil, []int{http.StatusNoContent, http.StatusNotFound}, "eda")
 	if statusCode == http.StatusNotFound {
 		return
 	}
